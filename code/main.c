@@ -23,7 +23,7 @@ int WINAPI WinMain(
         LPCWSTR class_name = L"WiredeckClass";
         WNDCLASSEXW window_class = {
             .cbSize = sizeof(WNDCLASSEXW),
-            .style = CS_HREDRAW | CS_VREDRAW,
+            .style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
             .lpfnWndProc = DefWindowProcW,
             .cbClsExtra = 0,
             .cbWndExtra = 0,

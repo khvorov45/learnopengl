@@ -1,3 +1,11 @@
 {
-  "cSpell.words": ["HREDRAW", "HWND", "lpfn", "LPSTR", "VREDRAW", "WNDCLASSEXW"]
+  "cSpell.words": [
+    "HREDRAW",
+    "HWND",
+    "lpfn",
+    "LPSTR",
+    "OWNDC",
+    "VREDRAW",
+    "WNDCLASSEXW"
+  ]
 }
