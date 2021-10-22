@@ -22,6 +22,10 @@ int WINAPI WinMain(
     LPSTR     lpCmdLine,
     int       nShowCmd
 ) {
+    //
+    // SECTION Window with OpenGL context
+    //
+
     LPCWSTR class_name = L"WindowClass";
     WNDCLASSEXW window_class = {
         .cbSize = sizeof(WNDCLASSEXW),
@@ -154,6 +158,15 @@ int WINAPI WinMain(
 
     wglMakeCurrent(device_context, opengl_context);
 
+    // NOTE(sen) This is to avoid the white flash when the window is shown but
+    // haven't yet received the paint background message
+    ShowWindow(window, SW_SHOWMINIMIZED);
+    ShowWindow(window, SW_SHOWNORMAL);
+
+    //
+    // SECTION Load OpenGL
+    //
+
     PFNGLCREATESHADERPROC glCreateShader = (PFNGLCREATESHADERPROC)wglGetProcAddress("glCreateShader");
     PFNGLGENBUFFERSPROC glGenBuffers = (PFNGLGENBUFFERSPROC)wglGetProcAddress("glGenBuffers");
     PFNGLBINDBUFFERPROC glBindBuffer = (PFNGLBINDBUFFERPROC)wglGetProcAddress("glBindBuffer");
@@ -166,23 +179,15 @@ int WINAPI WinMain(
     PFNGLLINKPROGRAMPROC glLinkProgram = (PFNGLLINKPROGRAMPROC)wglGetProcAddress("glLinkProgram");
     PFNGLUSEPROGRAMPROC glUseProgram = (PFNGLUSEPROGRAMPROC)wglGetProcAddress("glUseProgram");
     PFNGLGETPROGRAMIVPROC glGetProgramiv = (PFNGLGETPROGRAMIVPROC)wglGetProcAddress("glGetProgramiv");
+    PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)wglGetProcAddress("glVertexAttribPointer");
+    PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)wglGetProcAddress("glEnableVertexAttribArray");
+    PFNGLGENVERTEXARRAYSPROC glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)wglGetProcAddress("glGenVertexArrays");
+    PFNGLBINDVERTEXARRAYPROC glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)wglGetProcAddress("glBindVertexArray");
+    PFNGLDRAWARRAYSEXTPROC glDrawArrays = (PFNGLDRAWARRAYSEXTPROC)wglGetProcAddress("glDrawArrays");
 
-    // NOTE(sen) This is to avoid the white flash when the window is shown but
-    // haven't yet received the paint background message
-    ShowWindow(window, SW_SHOWMINIMIZED);
-    ShowWindow(window, SW_SHOWNORMAL);
-
-    f32 vertices[] = {
-        -0.5f, -0.5f, 0.0f,
-         0.5f, -0.5f, 0.0f,
-         0.0f,  0.5f, 0.0f
-    };
-
-    unsigned int vertex_buffer_id;
-    glGenBuffers(1, &vertex_buffer_id);
-
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_id);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    //
+    // SECTION Shaders
+    //
 
     const char* vertex_shader_source = "#version 330 core\n"
         "layout (location = 0) in vec3 aPos;\n"
@@ -214,18 +219,49 @@ int WINAPI WinMain(
     glAttachShader(shader_program, vertex_shader);
     glAttachShader(shader_program, fragment_shader);
     glLinkProgram(shader_program);
-    glUseProgram(shader_program);
 
     b32 program_success = false;
     glGetProgramiv(shader_program, GL_LINK_STATUS, &program_success);
+
+    //
+    // SECTION Triangle
+    //
+
+    f32 vertices[] = {
+     -0.5f, -0.5f, 0.0f,
+      0.5f, -0.5f, 0.0f,
+      0.0f,  0.5f, 0.0f
+    };
+
+    u32 vertex_array;
+    glGenVertexArrays(1, &vertex_array);
+
+    u32 vertex_buffer;
+    glGenBuffers(1, &vertex_buffer);
+
+    glBindVertexArray(vertex_array);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 
     for (;;) {
         MSG message;
         while (PeekMessageW(&message, window, 0, 0, PM_REMOVE)) {
             DispatchMessageW(&message);
         }
-        glClearColor(1.0f, 0.3f, 0.7f, 1.0f);
+        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+
+        glUseProgram(shader_program);
+        glBindVertexArray(vertex_array);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
         SwapBuffers(device_context);
     }
 
