@@ -184,6 +184,8 @@ int WINAPI WinMain(
     PFNGLGENVERTEXARRAYSPROC glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)wglGetProcAddress("glGenVertexArrays");
     PFNGLBINDVERTEXARRAYPROC glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)wglGetProcAddress("glBindVertexArray");
     PFNGLDRAWARRAYSEXTPROC glDrawArrays = (PFNGLDRAWARRAYSEXTPROC)wglGetProcAddress("glDrawArrays");
+    PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)wglGetProcAddress("glGetUniformLocation");
+    PFNGLUNIFORM4FPROC glUniform4f = (PFNGLUNIFORM4FPROC)wglGetProcAddress("glUniform4f");
 
     //
     // SECTION Shaders
@@ -207,9 +209,10 @@ int WINAPI WinMain(
     const char* fragment_shader_source = "#version 330 core\n"
         "out vec4 FragColor;\n"
         "in vec4 vertexColor;\n"
+        "uniform vec4 ourColor;\n"
         "void main()\n"
         "{\n"
-        "   FragColor = vertexColor;\n"
+        "   FragColor = ourColor;\n"
         "}\0";
 
     u32 fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -265,6 +268,8 @@ int WINAPI WinMain(
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
+    f32 green = 0.0f;
+    f32 green_coef = 0.01f;
     for (;;) {
         MSG message;
         while (PeekMessageW(&message, window, 0, 0, PM_REMOVE)) {
@@ -274,6 +279,15 @@ int WINAPI WinMain(
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(shader_program);
+
+        i32 vertexColorLocation = glGetUniformLocation(shader_program, "ourColor");
+        glUniform4f(vertexColorLocation, 0.0f, green, 0.0f, 1.0f);
+        green += green_coef;
+        if (green > 1.0f || green < 0.0f) {
+            green_coef = -green_coef;
+            green += green_coef;
+        }
+
         glBindVertexArray(vertex_array);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
