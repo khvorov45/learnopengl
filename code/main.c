@@ -186,6 +186,7 @@ int WINAPI WinMain(
     PFNGLDRAWARRAYSEXTPROC glDrawArrays = (PFNGLDRAWARRAYSEXTPROC)wglGetProcAddress("glDrawArrays");
     PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)wglGetProcAddress("glGetUniformLocation");
     PFNGLUNIFORM4FPROC glUniform4f = (PFNGLUNIFORM4FPROC)wglGetProcAddress("glUniform4f");
+    PFNGLGENERATEMIPMAPPROC glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)wglGetProcAddress("glGenerateMipmap");
 
     //
     // SECTION Shaders
@@ -194,11 +195,14 @@ int WINAPI WinMain(
     const char* vertex_shader_source = "#version 330 core\n"
         "layout (location = 0) in vec3 aPos;\n"
         "layout (location = 1) in vec3 aColor;\n"
+        "layout (location = 2) in vec2 aTexCoord;\n"
         "out vec3 ourColor;"
+        "out vec2 TexCoord;"
         "void main()\n"
         "{\n"
         "   gl_Position = vec4(aPos, 1.0);\n"
         "   ourColor = aColor;\n"
+        "   TexCoord = aTexCoord;\n"
         "}\0";
 
     u32 vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -210,9 +214,11 @@ int WINAPI WinMain(
     const char* fragment_shader_source = "#version 330 core\n"
         "out vec4 FragColor;\n"
         "in vec3 ourColor;\n"
+        "in vec2 TexCoord;\n"
+        "uniform sampler2D ourTexture;\n"
         "void main()\n"
         "{\n"
-        "   FragColor = vec4(ourColor, 1.0f);\n"
+        "   FragColor = texture(ourTexture, TexCoord);\n"
         "}\0";
 
     u32 fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -234,10 +240,16 @@ int WINAPI WinMain(
     //
 
     float vertices[] = {
-        // positions         // colors
-         0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,   // bottom right
-        -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,   // bottom left
-         0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f    // top
+        // positions          // colors           // texture coords
+         0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
+         0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f,   // bottom right
+        -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left
+        -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f    // top left
+    };
+
+    unsigned int indices[] = {
+        0, 1, 3, // first triangle
+        1, 2, 3  // second triangle
     };
 
     u32 vertex_array;
@@ -246,22 +258,52 @@ int WINAPI WinMain(
     u32 vertex_buffer;
     glGenBuffers(1, &vertex_buffer);
 
+    u32 element_buffer;
+    glGenBuffers(1, &element_buffer);
+
     glBindVertexArray(vertex_array);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(f32)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(f32)));
     glEnableVertexAttribArray(1);
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(f32)));
+    glEnableVertexAttribArray(2);
 
-    f32 green = 0.0f;
-    f32 green_coef = 0.01f;
+    u32 texture_width = 2;
+    u32 texture_height = 2;
+    u32 texture_bytes_per_row = texture_width * 4;
+    u32* texture_data = VirtualAlloc(0, texture_height * texture_bytes_per_row, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    for (u32 texel_y = 0; texel_y < texture_height; ++texel_y) {
+        for (u32 texel_x = 0; texel_x < texture_width; ++texel_x) {
+            texture_data[texel_y * texture_width + texel_x] = 0x000000FF;
+        }
+    }
+    texture_data[0] = 0x000000FF;
+    texture_data[1] = 0x0000FF00;
+    texture_data[2] = 0x00FF0000;
+    texture_data[3] = 0xFF000000;
+
+    u32 texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0f, 0.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_data);
+    //glGenerateMipmap(GL_TEXTURE_2D);
+
     for (;;) {
         MSG message;
         while (PeekMessageW(&message, window, 0, 0, PM_REMOVE)) {
@@ -270,10 +312,12 @@ int WINAPI WinMain(
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
+        glBindTexture(GL_TEXTURE_2D, texture);
+
         glUseProgram(shader_program);
 
         glBindVertexArray(vertex_array);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         SwapBuffers(device_context);
     }
