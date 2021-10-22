@@ -1,11 +1,17 @@
 {
   "cSpell.words": [
+    "HGLRC",
     "HREDRAW",
     "HWND",
     "lpfn",
     "LPSTR",
     "OWNDC",
+    "PFNWGLCHOOSEPIXELFORMATARBPROC",
+    "PFNWGLCREATECONTEXTATTRIBSARBPROC",
     "VREDRAW",
     "WNDCLASSEXW"
-  ]
+  ],
+  "files.associations": {
+    "gl.h": "c"
+  }
 }
